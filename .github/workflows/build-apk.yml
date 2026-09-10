@@ -16,24 +16,49 @@ jobs:
 
       - name: Extract QuestMate
         run: |
+          rm -rf project
+          mkdir project
           unzip QuestMate-Android-Prototype.zip -d project
+
+      - name: Find Android Gradle project
+        run: |
+          echo "Searching for Gradle project..."
+
+          SETTINGS_FILE=$(find project -type f -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: Could not find settings.gradle or settings.gradle.kts"
+            find project -maxdepth 5 -type f | sort
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          echo "Found Gradle project:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Configure AndroidX
         run: |
-          echo "android.useAndroidX=true" >> project/gradle.properties
-          echo "android.enableJetifier=true" >> project/gradle.properties
+          echo "android.useAndroidX=true" >> "$PROJECT_DIR/gradle.properties"
+          echo "android.enableJetifier=true" >> "$PROJECT_DIR/gradle.properties"
 
-      - name: Fix Java and Kotlin JVM targets
+      - name: Create JVM compatibility fix
         run: |
-          cat >> project/app/build.gradle <<'EOF'
+          cat > "$PROJECT_DIR/jvm-fix.gradle" <<'EOF'
+          allprojects {
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 17
+              }
 
-          tasks.withType(JavaCompile).configureEach {
-              options.release = 17
-          }
-
-          tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-              kotlinOptions {
-                  jvmTarget = "17"
+              tasks.configureEach { task ->
+                  if (task.name.toLowerCase().contains("kotlin")) {
+                      try {
+                          task.kotlinOptions.jvmTarget = "17"
+                      } catch (Exception ignored) {
+                      }
+                  }
               }
           }
           EOF
@@ -49,12 +74,26 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
-        working-directory: project
-        run: gradle assembleDebug --no-daemon
+      - name: Show Gradle project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo "Building from:"
+          pwd
+          echo ""
+          echo "Files:"
+          find . -maxdepth 3 -type f | sort
+          echo ""
+          echo "Available Gradle tasks:"
+          gradle tasks --all
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: QuestMate-APK
-          path: project/app/build/outputs/apk/debug/app-debug.apk
+      - name: Build APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          gradle \
+            --init-script jvm-fix.gradle \
+            assembleDebug \
+            --no-daemon
+
+      - name: Find APK
+        run: |
+          echo "Searching
