@@ -30,11 +30,11 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: project/QuestMate
+        working-directory: project
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: QuestMate-APK
-          path: project/QuestMate/app/build/outputs/apk/debug/app-debug.apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
