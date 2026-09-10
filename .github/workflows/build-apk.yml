@@ -11,16 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract QuestMate project
+      - name: Extract QuestMate
         run: |
-          mkdir project
           unzip QuestMate-Android-Prototype.zip -d project
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -31,11 +30,11 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: project
+        working-directory: project/QuestMate
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: QuestMate-debug
-          path: project/app/build/outputs/apk/debug/app-debug.apk
+          name: QuestMate-APK
+          path: project/QuestMate/app/build/outputs/apk/debug/app-debug.apk
